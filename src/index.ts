@@ -10,7 +10,7 @@ async function main() {
     console.log('✅ Environment validated');
 
     // Initialize database
-    initDatabase();
+    await initDatabase();
     console.log('✅ Database initialized');
 
     // Initialize Spotify client
