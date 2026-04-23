@@ -31,7 +31,7 @@ export async function getTopArtists(
   return res.items.map((a) => ({
     id: a.id,
     name: a.name,
-    genres: a.genres,
+    genres: a.genres ?? [],
     popularity: a.popularity,
     imageUrl: a.images[0]?.url,
   }));
