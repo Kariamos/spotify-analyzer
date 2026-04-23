@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.*.local
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+data/
+*.db
+*.db-wal
+*.db-shm
+.vscode/
+.idea/
+*.swp
+*.swo

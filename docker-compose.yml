@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  spotify-analyzer:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      - NODE_ENV=development
+      - DB_PATH=/data/spotify.db
+    env_file:
+      - .env
+    command: npm run dev
