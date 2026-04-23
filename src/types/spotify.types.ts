@@ -3,9 +3,28 @@ export interface SpotifyTrack {
   name: string;
   artist: string;
   album: string;
+  albumArt?: string;
   playedAt: Date;
   releaseDate: string;
   durationMs: number;
+  popularity?: number;
+}
+
+export interface TopArtist {
+  id: string;
+  name: string;
+  genres: string[];
+  popularity: number;
+  imageUrl?: string;
+}
+
+export interface TopTrack {
+  id: string;
+  name: string;
+  artist: string;
+  albumArt?: string;
+  popularity: number;
+  releaseDate: string;
 }
 
 export interface AudioFeatures {
@@ -37,8 +56,13 @@ export interface MoodCluster {
 export interface AnalysisResult {
   decadePreferences: Record<number, number>;
   listeningPatterns: Record<number, number>;
-  topArtists: Array<{ artist: string; count: number }>;
-  topTracks: Array<{ name: string; artist: string; count: number }>;
+  recentTopArtists: Array<{ artist: string; count: number }>;
+  recentTopTracks: Array<{ name: string; artist: string; count: number; albumArt?: string }>;
+  topArtistsShort: TopArtist[];
+  topArtistsMedium: TopArtist[];
+  topTracksShort: TopTrack[];
+  genreDistribution: Record<string, number>;
+  avgPopularity: number;
   totalTracksAnalyzed: number;
   uniqueArtists: number;
   analysisDate: Date;

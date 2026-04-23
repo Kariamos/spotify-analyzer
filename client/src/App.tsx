@@ -1,21 +1,28 @@
 import { useEffect, useState } from 'react'
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const API = 'http://127.0.0.1:3000'
+
+interface TopArtist { id: string; name: string; genres: string[]; popularity: number; imageUrl?: string }
+interface TopTrack { id: string; name: string; artist: string; albumArt?: string; popularity: number; releaseDate: string }
 
 interface AnalysisResult {
   decadePreferences: Record<number, number>
   listeningPatterns: Record<number, number>
-  topArtists: Array<{ artist: string; count: number }>
-  topTracks: Array<{ name: string; artist: string; count: number }>
+  recentTopArtists: Array<{ artist: string; count: number }>
+  recentTopTracks: Array<{ name: string; artist: string; count: number; albumArt?: string }>
+  topArtistsShort: TopArtist[]
+  topArtistsMedium: TopArtist[]
+  topTracksShort: TopTrack[]
+  genreDistribution: Record<string, number>
+  avgPopularity: number
   totalTracksAnalyzed: number
   uniqueArtists: number
   analysisDate: string
 }
 
-const COLORS = ['#1db954', '#1ed760', '#17a349', '#148a3e', '#117a36', '#0e6a2e']
+const GREEN = '#1db954'
+const COLORS = [GREEN, '#1ed760', '#17a349', '#148a3e', '#0e6a2e', '#3b82f6', '#8b5cf6', '#f59e0b']
 
 export default function App() {
   const [auth, setAuth] = useState<boolean | null>(null)
@@ -24,8 +31,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`${API}/api/auth/status`)
-      .then(r => r.json())
+    fetch(`${API}/api/auth/status`).then(r => r.json())
       .then(({ authenticated }) => setAuth(authenticated))
       .catch(() => setAuth(false))
   }, [])
@@ -33,102 +39,119 @@ export default function App() {
   useEffect(() => {
     if (!auth) return
     setLoading(true)
-    fetch(`${API}/api/insights/analysis`)
-      .then(r => r.json())
+    fetch(`${API}/api/insights/analysis`).then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [auth])
 
   if (auth === null) return <Screen>Checking auth…</Screen>
-
-  if (!auth) {
-    return (
-      <Screen>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
-          <h1 style={{ fontSize: 28, marginBottom: 8, fontWeight: 700 }}>Spotify Analyzer</h1>
-          <p style={{ color: '#aaa', marginBottom: 32 }}>Analisi dei tuoi ascolti recenti</p>
-          <a
-            href={`${API}/api/auth/login`}
-            style={{
-              background: '#1db954', color: '#000', padding: '14px 36px',
-              borderRadius: 24, fontWeight: 700, textDecoration: 'none', fontSize: 16,
-            }}
-          >
-            Login with Spotify
-          </a>
-        </div>
-      </Screen>
-    )
-  }
-
-  if (loading) return <Screen>Caricamento dati Spotify…</Screen>
-  if (error) return <Screen style={{ color: '#ef4444' }}>Errore: {error}</Screen>
+  if (!auth) return (
+    <Screen>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 56, marginBottom: 16 }}>🎵</div>
+        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Spotify Analyzer</h1>
+        <p style={{ color: '#777', marginBottom: 32 }}>Analisi dei tuoi ascolti</p>
+        <a href={`${API}/api/auth/login`} style={{
+          background: GREEN, color: '#000', padding: '14px 36px',
+          borderRadius: 24, fontWeight: 700, textDecoration: 'none', fontSize: 16,
+        }}>Login with Spotify</a>
+      </div>
+    </Screen>
+  )
+  if (loading) return <Screen>Caricamento dati…</Screen>
+  if (error) return <Screen>Errore: {error}</Screen>
   if (!data) return null
 
+  const topGenres = Object.entries(data.genreDistribution)
+    .sort((a, b) => b[1] - a[1]).slice(0, 10)
+    .map(([name, value]) => ({ name, value }))
+
   const decadeData = Object.entries(data.decadePreferences)
-    .map(([decade, count]) => ({ name: `${decade}s`, count }))
+    .map(([d, c]) => ({ name: `${d}s`, count: c }))
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const hourData = Array.from({ length: 24 }, (_, h) => ({
-    name: `${h}h`,
-    plays: data.listeningPatterns[h] ?? 0,
+    name: `${h}h`, plays: data.listeningPatterns[h] ?? 0,
   }))
 
-  const peakHour = hourData.reduce((max, h) => h.plays > max.plays ? h : max, hourData[0])
+  const peakHour = hourData.reduce((m, h) => h.plays > m.plays ? h : m, hourData[0])
 
   return (
     <div style={{ background: '#0f0f0f', minHeight: '100vh', color: '#fff', fontFamily: 'system-ui, sans-serif', padding: '24px 32px' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+
         <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>🎵 Spotify Analyzer</h1>
-        <p style={{ color: '#666', marginBottom: 32, fontSize: 13 }}>
+        <p style={{ color: '#555', fontSize: 13, marginBottom: 28 }}>
           Ultimi {data.totalTracksAnalyzed} ascolti · {new Date(data.analysisDate).toLocaleDateString('it-IT')}
         </p>
 
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
-          <Stat label="Tracce analizzate" value={data.totalTracksAnalyzed} />
+        {/* Stat bar */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
+          <Stat label="Tracce recenti" value={data.totalTracksAnalyzed} />
           <Stat label="Artisti unici" value={data.uniqueArtists} />
+          <Stat label="Popularity media" value={`${data.avgPopularity}/100`} />
           <Stat label="Ora di punta" value={peakHour.name} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
 
-          {/* Top artists */}
-          <Card title="Top Artisti">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={data.topArtists.slice(0, 8)} layout="vertical">
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="artist" width={120} tick={{ fontSize: 12, fill: '#ccc' }} />
-                <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff', borderRadius: 8 }} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {data.topArtists.slice(0, 8).map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          {/* Top tracks */}
-          <Card title="Tracce più ascoltate">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {data.topTracks.slice(0, 7).map((t, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ color: '#555', fontSize: 12, width: 16, textAlign: 'right' }}>{i + 1}</span>
+          {/* Top artists (short term) with photos */}
+          <Card title="Top Artisti — Ultime 4 settimane">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {data.topArtistsShort.slice(0, 8).map((a, i) => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ color: '#444', fontSize: 12, width: 18, textAlign: 'right' }}>{i + 1}</span>
+                  {a.imageUrl
+                    ? <img src={a.imageUrl} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
+                    : <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#2a2a2a' }} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
-                    <div style={{ fontSize: 11, color: '#888' }}>{t.artist}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</div>
+                    <div style={{ fontSize: 11, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.genres.slice(0, 2).join(', ') || '—'}
+                    </div>
                   </div>
-                  <span style={{ fontSize: 12, color: '#1db954', fontWeight: 700 }}>{t.count}×</span>
+                  <PopBar value={a.popularity} />
                 </div>
               ))}
             </div>
           </Card>
 
-          {/* Decade preferences */}
+          {/* Top tracks with album art */}
+          <Card title="Top Tracce — Ultime 4 settimane">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {data.topTracksShort.slice(0, 8).map((t, i) => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ color: '#444', fontSize: 12, width: 18, textAlign: 'right' }}>{i + 1}</span>
+                  {t.albumArt
+                    ? <img src={t.albumArt} alt="" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover' }} />
+                    : <div style={{ width: 38, height: 38, borderRadius: 6, background: '#2a2a2a' }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
+                    <div style={{ fontSize: 11, color: '#666' }}>{t.artist}</div>
+                  </div>
+                  <PopBar value={t.popularity} />
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Genre distribution */}
+          <Card title="Generi (da top artisti)">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={topGenres} layout="vertical">
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11, fill: '#ccc' }} />
+                <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff', borderRadius: 8 }} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {topGenres.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Decade */}
           <Card title="Preferenze per Decade">
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={decadeData}>
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#ccc' }} />
                 <YAxis hide />
@@ -138,44 +161,47 @@ export default function App() {
             </ResponsiveContainer>
           </Card>
 
-          {/* Listening by hour */}
-          <Card title="Quando ascolti">
-            <ResponsiveContainer width="100%" height={200}>
+          {/* Hourly pattern — full width */}
+          <Card title="Quando ascolti (ultime 50 tracce)" style={{ gridColumn: 'span 2' }}>
+            <ResponsiveContainer width="100%" height={160}>
               <BarChart data={hourData}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#888' }} interval={3} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#666' }} interval={1} />
                 <YAxis hide />
                 <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff', borderRadius: 8 }} />
-                <Bar dataKey="plays" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="plays" fill="#3b82f6" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
 
         </div>
-
-        <p style={{ marginTop: 24, color: '#444', fontSize: 12, textAlign: 'center' }}>
-          ⚠️ Audio features (mood, tonalità, energia) non disponibili — Spotify ha rimosso l'endpoint per app in Development Mode
-        </p>
       </div>
     </div>
   )
 }
 
-function Screen({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+function PopBar({ value }: { value: number }) {
   return (
-    <div style={{
-      background: '#0f0f0f', minHeight: '100vh', color: '#fff',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'system-ui, sans-serif', ...style,
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ width: 48, height: 3, background: '#222', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ width: `${value}%`, height: '100%', background: GREEN, borderRadius: 2 }} />
+      </div>
+      <span style={{ fontSize: 10, color: '#555', width: 24 }}>{value}</span>
+    </div>
+  )
+}
+
+function Screen({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ background: '#0f0f0f', minHeight: '100vh', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
       {children}
     </div>
   )
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children, style }: { title: string; children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: '#161616', borderRadius: 16, padding: 20 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 13, color: '#666', textTransform: 'uppercase', letterSpacing: 1 }}>{title}</h3>
+    <div style={{ background: '#161616', borderRadius: 16, padding: 20, ...style }}>
+      <h3 style={{ margin: '0 0 14px', fontSize: 12, color: '#555', textTransform: 'uppercase', letterSpacing: 1 }}>{title}</h3>
       {children}
     </div>
   )
@@ -183,9 +209,9 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div style={{ background: '#161616', borderRadius: 12, padding: '16px 20px' }}>
-      <div style={{ fontSize: 30, fontWeight: 700 }}>{value}</div>
-      <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{label}</div>
+    <div style={{ background: '#161616', borderRadius: 12, padding: '14px 18px' }}>
+      <div style={{ fontSize: 26, fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{label}</div>
     </div>
   )
 }
