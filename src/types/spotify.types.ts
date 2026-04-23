@@ -24,7 +24,7 @@ export interface AudioFeatures {
 }
 
 export interface EnrichedTrack extends SpotifyTrack {
-  features: AudioFeatures;
+  features: AudioFeatures | null;
 }
 
 export interface MoodCluster {

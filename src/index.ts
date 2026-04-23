@@ -1,57 +1,39 @@
 import express from 'express';
-import { validateEnv, env } from './config/env';
-import { initDatabase, closeDatabase } from './config/database';
-import { initSpotifyClient } from './config/spotify-client';
+import cors from 'cors';
+import { validateEnv, env } from './config/env.js';
+import { initDatabase, closeDatabase } from './config/database.js';
+import { authRouter } from './routes/auth.routes.js';
+import { insightsRouter } from './routes/insights.routes.js';
 
 async function main() {
-  try {
-    // Validate configuration
-    validateEnv();
-    console.log('✅ Environment validated');
+  validateEnv();
 
-    // Initialize database
-    await initDatabase();
-    console.log('✅ Database initialized');
+  await initDatabase();
 
-    // Initialize Spotify client
-    initSpotifyClient();
-    console.log('✅ Spotify client initialized');
+  const app = express();
+  app.use(express.json());
+  app.use(cors({ origin: 'http://127.0.0.1:5173', credentials: true }));
 
-    // Create Express app
-    const app = express();
-    app.use(express.json());
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date() });
+  });
 
-    // Health check endpoint
-    app.get('/health', (req, res) => {
-      res.json({ status: 'ok', timestamp: new Date() });
-    });
+  app.use('/api/auth', authRouter);
+  app.use('/api/insights', insightsRouter);
 
-    // Placeholder routes
-    app.get('/api/auth/login', (req, res) => {
-      res.json({ message: 'OAuth login route - TODO' });
-    });
+  const port = env.app.port;
+  app.listen(port, '127.0.0.1', () => {
+    console.log(`🎵 Spotify Analyzer on http://127.0.0.1:${port}`);
+    console.log(`🔐 Login: http://127.0.0.1:${port}/api/auth/login`);
+  });
 
-    app.get('/api/insights/:period', (req, res) => {
-      res.json({ message: 'Insights route - TODO', period: req.params.period });
-    });
-
-    // Start server
-    const port = env.app.port;
-    app.listen(port, () => {
-      console.log(`🎵 Spotify Analyzer running on port ${port}`);
-      console.log(`📝 Environment: ${env.app.env}`);
-    });
-
-    // Graceful shutdown
-    process.on('SIGINT', () => {
-      console.log('\n🛑 Shutting down gracefully...');
-      closeDatabase();
-      process.exit(0);
-    });
-  } catch (error) {
-    console.error('❌ Startup error:', error);
-    process.exit(1);
-  }
+  process.on('SIGINT', () => {
+    closeDatabase();
+    process.exit(0);
+  });
 }
 
-main();
+main().catch((err) => {
+  console.error('Startup error:', err);
+  process.exit(1);
+});
