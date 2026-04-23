@@ -35,16 +35,12 @@ export interface MoodCluster {
 }
 
 export interface AnalysisResult {
-  moodDistribution: Record<string, number>;
-  keyPreferences: Record<string, number>;
   decadePreferences: Record<number, number>;
   listeningPatterns: Record<number, number>;
   topArtists: Array<{ artist: string; count: number }>;
-  topGenres: Array<{ genre: string; count: number }>;
-  evolutionTrend: number[];
-  averageEnergy: number;
-  averageTempo: number;
+  topTracks: Array<{ name: string; artist: string; count: number }>;
   totalTracksAnalyzed: number;
+  uniqueArtists: number;
   analysisDate: Date;
 }
 

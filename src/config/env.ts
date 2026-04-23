@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 export const env = {
   spotify: {
@@ -32,4 +33,7 @@ export function validateEnv() {
   if (missing.length > 0) {
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);
   }
+
+  const id = process.env.SPOTIFY_CLIENT_ID ?? '';
+  console.log(`[env] SPOTIFY_CLIENT_ID loaded: ${id.substring(0, 4)}...${id.substring(id.length - 4)} (len=${id.length})`);
 }

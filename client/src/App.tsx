@@ -1,36 +1,21 @@
 import { useEffect, useState } from 'react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 
 const API = 'http://127.0.0.1:3000'
 
 interface AnalysisResult {
-  moodDistribution: Record<string, number>
-  keyPreferences: Record<string, number>
   decadePreferences: Record<number, number>
   listeningPatterns: Record<number, number>
   topArtists: Array<{ artist: string; count: number }>
-  evolutionTrend: number[]
-  averageEnergy: number
-  averageTempo: number
+  topTracks: Array<{ name: string; artist: string; count: number }>
   totalTracksAnalyzed: number
+  uniqueArtists: number
   analysisDate: string
 }
 
-function toChartData(obj: Record<string | number, number>) {
-  return Object.entries(obj)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
-}
-
-const MOOD_COLORS: Record<string, string> = {
-  Upbeat: '#22c55e',
-  Intense: '#ef4444',
-  Chill: '#3b82f6',
-  Melancholic: '#8b5cf6',
-}
+const COLORS = ['#1db954', '#1ed760', '#17a349', '#148a3e', '#117a36', '#0e6a2e']
 
 export default function App() {
   const [auth, setAuth] = useState<boolean | null>(null)
@@ -60,12 +45,13 @@ export default function App() {
     return (
       <Screen>
         <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontSize: 28, marginBottom: 8 }}>🎵 Spotify Analyzer</h1>
-          <p style={{ color: '#aaa', marginBottom: 24 }}>Connect your Spotify account to see insights</p>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
+          <h1 style={{ fontSize: 28, marginBottom: 8, fontWeight: 700 }}>Spotify Analyzer</h1>
+          <p style={{ color: '#aaa', marginBottom: 32 }}>Analisi dei tuoi ascolti recenti</p>
           <a
             href={`${API}/api/auth/login`}
             style={{
-              background: '#1db954', color: '#000', padding: '12px 32px',
+              background: '#1db954', color: '#000', padding: '14px 36px',
               borderRadius: 24, fontWeight: 700, textDecoration: 'none', fontSize: 16,
             }}
           >
@@ -76,119 +62,110 @@ export default function App() {
     )
   }
 
-  if (loading) return <Screen>Analyzing your listening history…</Screen>
-  if (error) return <Screen>Error: {error}</Screen>
+  if (loading) return <Screen>Caricamento dati Spotify…</Screen>
+  if (error) return <Screen style={{ color: '#ef4444' }}>Errore: {error}</Screen>
   if (!data) return null
 
-  const moodData = toChartData(data.moodDistribution)
-  const keyData = toChartData(data.keyPreferences).slice(0, 8)
-  const decadeData = toChartData(data.decadePreferences).map(d => ({ ...d, name: `${d.name}s` }))
+  const decadeData = Object.entries(data.decadePreferences)
+    .map(([decade, count]) => ({ name: `${decade}s`, count }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   const hourData = Array.from({ length: 24 }, (_, h) => ({
     name: `${h}h`,
     plays: data.listeningPatterns[h] ?? 0,
   }))
-  const trendData = data.evolutionTrend.map((energy, i) => ({
-    name: i === 0 ? 'Today' : `${i}d ago`,
-    energy: Math.round(energy * 100) / 100,
-  })).reverse()
+
+  const peakHour = hourData.reduce((max, h) => h.plays > max.plays ? h : max, hourData[0])
 
   return (
-    <div style={{ background: '#0f0f0f', minHeight: '100vh', color: '#fff', fontFamily: 'system-ui, sans-serif', padding: 24 }}>
-      <h1 style={{ fontSize: 24, marginBottom: 4 }}>🎵 Spotify Analyzer</h1>
-      <p style={{ color: '#888', marginBottom: 32, fontSize: 14 }}>
-        Based on last {data.totalTracksAnalyzed} tracks · {new Date(data.analysisDate).toLocaleDateString()}
-      </p>
+    <div style={{ background: '#0f0f0f', minHeight: '100vh', color: '#fff', fontFamily: 'system-ui, sans-serif', padding: '24px 32px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>🎵 Spotify Analyzer</h1>
+        <p style={{ color: '#666', marginBottom: 32, fontSize: 13 }}>
+          Ultimi {data.totalTracksAnalyzed} ascolti · {new Date(data.analysisDate).toLocaleDateString('it-IT')}
+        </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
-        <Stat label="Avg Energy" value={`${Math.round(data.averageEnergy * 100)}%`} />
-        <Stat label="Avg Tempo" value={`${Math.round(data.averageTempo)} BPM`} />
-        <Stat label="Tracks Analyzed" value={data.totalTracksAnalyzed} />
-      </div>
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+          <Stat label="Tracce analizzate" value={data.totalTracksAnalyzed} />
+          <Stat label="Artisti unici" value={data.uniqueArtists} />
+          <Stat label="Ora di punta" value={peakHour.name} />
+        </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
 
-        <Card title="Mood Distribution">
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {moodData.map(({ name, value }) => (
-              <div key={name} style={{
-                flex: 1, minWidth: 80, background: '#1a1a1a', borderRadius: 12,
-                padding: '16px 12px', textAlign: 'center',
-                borderTop: `3px solid ${MOOD_COLORS[name] ?? '#888'}`,
-              }}>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>{value}</div>
-                <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>{name}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
+          {/* Top artists */}
+          <Card title="Top Artisti">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={data.topArtists.slice(0, 8)} layout="vertical">
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="artist" width={120} tick={{ fontSize: 12, fill: '#ccc' }} />
+                <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff', borderRadius: 8 }} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {data.topArtists.slice(0, 8).map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
 
-        <Card title="Top Artists">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data.topArtists.slice(0, 6)} layout="vertical">
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="artist" width={110} tick={{ fontSize: 12, fill: '#ccc' }} />
-              <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff' }} />
-              <Bar dataKey="count" fill="#1db954" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+          {/* Top tracks */}
+          <Card title="Tracce più ascoltate">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.topTracks.slice(0, 7).map((t, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ color: '#555', fontSize: 12, width: 16, textAlign: 'right' }}>{i + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>{t.artist}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: '#1db954', fontWeight: 700 }}>{t.count}×</span>
+                </div>
+              ))}
+            </div>
+          </Card>
 
-        <Card title="Favourite Keys">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={keyData}>
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#ccc' }} />
-              <YAxis hide />
-              <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff' }} />
-              <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+          {/* Decade preferences */}
+          <Card title="Preferenze per Decade">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={decadeData}>
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#ccc' }} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff', borderRadius: 8 }} />
+                <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
 
-        <Card title="Decade Preferences">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={decadeData}>
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#ccc' }} />
-              <YAxis hide />
-              <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff' }} />
-              <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+          {/* Listening by hour */}
+          <Card title="Quando ascolti">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={hourData}>
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#888' }} interval={3} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff', borderRadius: 8 }} />
+                <Bar dataKey="plays" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
 
-        <Card title="When You Listen">
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={hourData}>
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#888' }} interval={3} />
-              <YAxis hide />
-              <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff' }} />
-              <Bar dataKey="plays" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+        </div>
 
-        <Card title="Energy Trend (7 days)">
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
-              <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: '#888' }} />
-              <Tooltip contentStyle={{ background: '#1a1a1a', border: 'none', color: '#fff' }} />
-              <Line type="monotone" dataKey="energy" stroke="#1db954" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
-
+        <p style={{ marginTop: 24, color: '#444', fontSize: 12, textAlign: 'center' }}>
+          ⚠️ Audio features (mood, tonalità, energia) non disponibili — Spotify ha rimosso l'endpoint per app in Development Mode
+        </p>
       </div>
     </div>
   )
 }
 
-function Screen({ children }: { children: React.ReactNode }) {
+function Screen({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
       background: '#0f0f0f', minHeight: '100vh', color: '#fff',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'system-ui, sans-serif',
+      fontFamily: 'system-ui, sans-serif', ...style,
     }}>
       {children}
     </div>
@@ -198,7 +175,7 @@ function Screen({ children }: { children: React.ReactNode }) {
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ background: '#161616', borderRadius: 16, padding: 20 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 14, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>{title}</h3>
+      <h3 style={{ margin: '0 0 16px', fontSize: 13, color: '#666', textTransform: 'uppercase', letterSpacing: 1 }}>{title}</h3>
       {children}
     </div>
   )
@@ -207,8 +184,8 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div style={{ background: '#161616', borderRadius: 12, padding: '16px 20px' }}>
-      <div style={{ fontSize: 28, fontWeight: 700 }}>{value}</div>
-      <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 30, fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{label}</div>
     </div>
   )
 }

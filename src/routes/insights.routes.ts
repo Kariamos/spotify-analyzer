@@ -31,7 +31,8 @@ insightsRouter.get('/analysis', async (_req, res) => {
     const result = analyze(tracks);
     res.json(result);
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error('Error analyzing tracks:', err);
-    res.status(500).json({ error: 'Analysis failed' });
+    res.status(500).json({ error: 'Analysis failed', detail: msg });
   }
 });

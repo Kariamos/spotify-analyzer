@@ -1,48 +1,48 @@
-import { Router } from 'express';
-import { SpotifyApi } from '@spotify/web-api-ts-sdk';
-import { env } from '../config/env.js';
+import { Router } from "express";
+import { SpotifyApi } from "@spotify/web-api-ts-sdk";
+import { env } from "../config/env.js";
 
 export const authRouter = Router();
 
 // In-memory token store (single user, personal tool)
 export let userSpotify: SpotifyApi | null = null;
 
-authRouter.get('/login', (_req, res) => {
+authRouter.get("/login", (_req, res) => {
   const params = new URLSearchParams({
     client_id: env.spotify.clientId,
-    response_type: 'code',
+    response_type: "code",
     redirect_uri: env.spotify.redirectUri,
     scope: [
-      'user-read-private',
-      'user-read-email',
-      'user-read-recently-played',
-      'user-top-read',
-    ].join(' '),
+      "user-read-private",
+      "user-read-email",
+      "user-read-recently-played",
+      "user-top-read",
+    ].join(" "),
   });
 
   res.redirect(`https://accounts.spotify.com/authorize?${params}`);
 });
 
-authRouter.get('/callback', async (req, res) => {
-  const code = req.query['code'] as string | undefined;
-  const error = req.query['error'] as string | undefined;
+authRouter.get("/callback", async (req, res) => {
+  const code = req.query["code"] as string | undefined;
+  const error = req.query["error"] as string | undefined;
 
   if (error || !code) {
-    res.status(400).json({ error: error ?? 'No code received' });
+    res.status(400).json({ error: error ?? "No code received" });
     return;
   }
 
   try {
-    const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
+    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
         Authorization: `Basic ${Buffer.from(
-          `${env.spotify.clientId}:${env.spotify.clientSecret}`
-        ).toString('base64')}`,
+          `${env.spotify.clientId}:${env.spotify.clientSecret}`,
+        ).toString("base64")}`,
       },
       body: new URLSearchParams({
-        grant_type: 'authorization_code',
+        grant_type: "authorization_code",
         code,
         redirect_uri: env.spotify.redirectUri,
       }),
@@ -64,13 +64,13 @@ authRouter.get('/callback', async (req, res) => {
     });
 
     // Redirect to dashboard
-    res.redirect('http://127.0.0.1:5173');
+    res.redirect("http://localhost:5173");
   } catch (err) {
-    console.error('OAuth callback error:', err);
-    res.status(500).json({ error: 'Token exchange failed' });
+    console.error("OAuth callback error:", err);
+    res.status(500).json({ error: "Token exchange failed" });
   }
 });
 
-authRouter.get('/status', (_req, res) => {
+authRouter.get("/status", (_req, res) => {
   res.json({ authenticated: userSpotify !== null });
 });
