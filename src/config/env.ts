@@ -17,12 +17,12 @@ export const env = {
   database: {
     path: process.env.DB_PATH || './data/spotify.db',
   },
-  cache: {
-    ttlMinutes: parseInt(process.env.CACHE_TTL_MINUTES || '360', 10),
+  lastfm: {
+    apiKey: process.env.LASTFM_API_KEY || '',
   },
-  sync: {
-    intervalHours: parseInt(process.env.SYNC_INTERVAL_HOURS || '6', 10),
-    enabled: process.env.SYNC_ENABLED !== 'false',
+  import: {
+    zipPath: process.env.IMPORT_ZIP_PATH || './my_spotify_data.zip',
+    enrichmentEnabled: process.env.ENRICHMENT_ENABLED !== 'false',
   },
 };
 

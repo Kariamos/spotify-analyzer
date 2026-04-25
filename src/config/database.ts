@@ -30,61 +30,45 @@ export function initDatabase(): Promise<sqlite3.Database> {
 
 function createTables() {
   db.serialize(() => {
-    db.run(`
-      CREATE TABLE IF NOT EXISTS tracks (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        artist TEXT NOT NULL,
-        album TEXT,
-        played_at DATETIME NOT NULL,
-        release_date TEXT,
-        duration_ms INTEGER,
-        energy REAL,
-        danceability REAL,
-        valence REAL,
-        acousticness REAL,
-        instrumentalness REAL,
-        speechiness REAL,
-        liveness REAL,
-        loudness REAL,
-        tempo REAL,
-        key INTEGER,
-        mode INTEGER,
-        time_signature INTEGER,
-        analyzed BOOLEAN DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.run(`CREATE INDEX IF NOT EXISTS idx_tracks_played_at ON tracks(played_at)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_tracks_analyzed ON tracks(analyzed)`);
 
     db.run(`
-      CREATE TABLE IF NOT EXISTS analysis_cache (
+      CREATE TABLE IF NOT EXISTS streaming_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        period TEXT NOT NULL,
-        data TEXT NOT NULL,
-        cached_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME
+        ts TEXT NOT NULL,
+        ms_played INTEGER NOT NULL,
+        platform TEXT,
+        track_name TEXT,
+        artist_name TEXT,
+        album_name TEXT,
+        spotify_track_uri TEXT,
+        episode_name TEXT,
+        episode_show_name TEXT,
+        reason_start TEXT,
+        reason_end TEXT,
+        shuffle INTEGER,
+        skipped INTEGER,
+        offline INTEGER,
+        conn_country TEXT,
+        content_type TEXT DEFAULT 'track',
+        UNIQUE(ts, spotify_track_uri)
       )
     `);
 
-    db.run(`CREATE INDEX IF NOT EXISTS idx_cache_period ON analysis_cache(period)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_cache_expires ON analysis_cache(expires_at)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_sh_ts ON streaming_history(ts)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_sh_uri ON streaming_history(spotify_track_uri)`);
 
     db.run(`
-      CREATE TABLE IF NOT EXISTS sync_logs (
-        sync_id TEXT PRIMARY KEY,
-        started_at DATETIME NOT NULL,
-        completed_at DATETIME,
-        tracks_processed INTEGER DEFAULT 0,
-        status TEXT DEFAULT 'pending',
-        error TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      CREATE TABLE IF NOT EXISTS track_enrichment (
+        spotify_uri TEXT PRIMARY KEY,
+        lastfm_tags TEXT,
+        mood TEXT,
+        lastfm_listeners INTEGER,
+        mbid TEXT,
+        bpm INTEGER,
+        musical_key TEXT,
+        enriched_at TEXT
       )
     `);
-
-    db.run(`CREATE INDEX IF NOT EXISTS idx_sync_status ON sync_logs(status)`);
   });
 }
 

@@ -14,3 +14,10 @@ data/
 .idea/
 *.swp
 *.swo
+
+# Personal data exports — never commit
+my_spotify_data.zip
+*.zip
+
+# Claude Code local settings (per-machine permissions)
+.claude/settings.local.json

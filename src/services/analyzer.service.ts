@@ -1,4 +1,4 @@
-import type { EnrichedTrack, TopArtist, TopTrack, AnalysisResult } from '../types/spotify.types.js';
+import type { SpotifyTrack, TopArtist, TopTrack, AnalysisResult } from '../types/spotify.types.js';
 
 function getDecade(releaseDate: string): number {
   const year = parseInt(releaseDate?.substring(0, 4) ?? '0', 10);
@@ -6,7 +6,7 @@ function getDecade(releaseDate: string): number {
 }
 
 export function analyze(
-  recent: EnrichedTrack[],
+  recent: SpotifyTrack[],
   topArtistsShort: TopArtist[],
   topArtistsMedium: TopArtist[],
   topTracksShort: TopTrack[]

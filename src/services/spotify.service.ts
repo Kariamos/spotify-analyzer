@@ -1,10 +1,10 @@
 import { SpotifyApi } from '@spotify/web-api-ts-sdk';
-import type { EnrichedTrack, TopArtist, TopTrack } from '../types/spotify.types.js';
+import type { SpotifyTrack, TopArtist, TopTrack } from '../types/spotify.types.js';
 
 export async function getRecentlyPlayed(
   spotify: SpotifyApi,
   limit = 50
-): Promise<EnrichedTrack[]> {
+): Promise<SpotifyTrack[]> {
   const history = await spotify.player.getRecentlyPlayedTracks(limit as 50);
 
   return history.items.map((item) => ({
@@ -17,7 +17,6 @@ export async function getRecentlyPlayed(
     releaseDate: item.track.album.release_date,
     durationMs: item.track.duration_ms,
     popularity: item.track.popularity,
-    features: null,
   }));
 }
 

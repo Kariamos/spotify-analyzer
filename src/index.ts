@@ -4,6 +4,7 @@ import { validateEnv, env } from './config/env.js';
 import { initDatabase, closeDatabase } from './config/database.js';
 import { authRouter } from './routes/auth.routes.js';
 import { insightsRouter } from './routes/insights.routes.js';
+import { importRouter } from './routes/import.routes.js';
 
 async function main() {
   validateEnv();
@@ -23,6 +24,7 @@ async function main() {
 
   app.use('/api/auth', authRouter);
   app.use('/api/insights', insightsRouter);
+  app.use('/api/import', importRouter);
 
   const port = env.app.port;
   app.listen(port, '127.0.0.1', () => {
