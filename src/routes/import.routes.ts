@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { importHistory } from '../services/import.service.js';
-import { runEnrichment, getEnrichmentStatus } from '../services/enrichment.service.js';
+import { runEnrichment, getEnrichmentStatus, reclassifyMoods } from '../services/enrichment.service.js';
 import { env } from '../config/env.js';
 
 export const importRouter = Router();
@@ -32,6 +32,17 @@ importRouter.post('/enrich', (_req, res) => {
   }
   runEnrichment().catch(err => console.error('[enrichment] Background error:', err));
   res.json({ message: 'Enrichment started in background' });
+});
+
+importRouter.post('/reclassify-mood', async (_req, res) => {
+  try {
+    const result = await reclassifyMoods();
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[reclassify] Error:', err);
+    res.status(500).json({ error: 'Reclassify failed', detail: msg });
+  }
 });
 
 importRouter.get('/enrichment-status', async (_req, res) => {

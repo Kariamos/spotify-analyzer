@@ -114,6 +114,11 @@ export interface EvolutionResult {
   }>;
 }
 
+export interface MoodByHourResult {
+  data: Array<Record<string, number> & { hour: number }>;
+  moods: string[];
+}
+
 export interface PatternsResult {
   heatmap: Array<{ day: number; hour: number; plays: number }>;
   discoveryRate: Array<{ month: string; newArtists: number }>;

@@ -48,7 +48,7 @@ export async function getTopTracks(
     name: t.name,
     artist: t.artists[0]?.name ?? 'Unknown',
     albumArt: t.album.images[0]?.url,
-    popularity: t.popularity,
+    popularity: t.popularity ?? 0,
     releaseDate: t.album.release_date,
   }));
 }

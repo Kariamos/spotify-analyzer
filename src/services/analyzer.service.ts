@@ -41,7 +41,7 @@ export function analyze(
   }
 
   const avgPopularity = topTracksShort.length
-    ? Math.round(topTracksShort.reduce((s, t) => s + t.popularity, 0) / topTracksShort.length)
+    ? Math.round(topTracksShort.reduce((s, t) => s + (t.popularity ?? 0), 0) / topTracksShort.length)
     : 0;
 
   return {

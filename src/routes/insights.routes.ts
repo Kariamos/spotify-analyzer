@@ -3,7 +3,7 @@ import { getRecentlyPlayed, getTopArtists, getTopTracks } from '../services/spot
 import { analyze } from '../services/analyzer.service.js';
 import { userSpotify } from './auth.routes.js';
 import { getDatabase } from '../config/database.js';
-import type { HistoryResult, MoodResult, EvolutionResult, PatternsResult } from '../types/spotify.types.js';
+import type { HistoryResult, MoodResult, EvolutionResult, PatternsResult, MoodByHourResult } from '../types/spotify.types.js';
 
 export const insightsRouter = Router();
 
@@ -314,6 +314,38 @@ insightsRouter.get('/patterns', async (_req, res) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: 'Patterns query failed', detail: msg });
+  }
+});
+
+insightsRouter.get('/mood-by-hour', async (_req, res) => {
+  try {
+    const rows = await dbAll<{ hour: number; mood: string; plays: number }>(`
+      SELECT
+        CAST(strftime('%H', sh.ts) AS INTEGER) AS hour,
+        te.mood,
+        COUNT(*) AS plays
+      FROM streaming_history sh
+      JOIN track_enrichment te ON sh.spotify_track_uri = te.spotify_uri
+      WHERE te.mood IS NOT NULL
+        AND sh.ms_played > 30000
+      GROUP BY hour, te.mood
+      ORDER BY hour, plays DESC
+    `);
+
+    const hourMap: Record<number, Record<string, number>> = {};
+    for (const row of rows) {
+      if (!hourMap[row.hour]) hourMap[row.hour] = { hour: row.hour };
+      hourMap[row.hour][row.mood] = row.plays;
+    }
+
+    const result: MoodByHourResult = {
+      data: Array.from({ length: 24 }, (_, h) => ({ hour: h, ...(hourMap[h] ?? {}) })),
+      moods: [...new Set(rows.map(r => r.mood))],
+    };
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: 'Mood-by-hour query failed', detail: msg });
   }
 });
 

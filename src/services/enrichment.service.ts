@@ -2,16 +2,58 @@ import { getDatabase } from '../config/database.js';
 import { env } from '../config/env.js';
 import type { EnrichmentStatus } from '../types/spotify.types.js';
 
+// Order matters: more specific keys MUST come before broader ones,
+// because `lower.includes(key)` does substring matching (e.g. `post-hardcore` must
+// match before `hardcore`, `pop punk` before `punk`, `blues rock` before `blues`).
 const MOOD_MAP: Record<string, string> = {
-  energetic: 'Energetic', energy: 'Energetic', 'up-tempo': 'Energetic', upbeat: 'Energetic', dance: 'Energetic',
-  chill: 'Chill', relax: 'Chill', relaxing: 'Chill', ambient: 'Chill', mellow: 'Chill', lofi: 'Chill', 'lo-fi': 'Chill',
-  melancholy: 'Melancholic', sad: 'Melancholic', emotional: 'Melancholic', melancholic: 'Melancholic', heartbreak: 'Melancholic',
-  happy: 'Happy', 'feel-good': 'Happy', 'feel good': 'Happy', joy: 'Happy', joyful: 'Happy', fun: 'Happy',
-  dark: 'Dark', aggressive: 'Dark', intense: 'Dark', heavy: 'Dark', angry: 'Dark', metal: 'Dark',
-  romantic: 'Romantic', love: 'Romantic', sensual: 'Romantic',
+  // --- Romantic (specific phrases first) ---
+  'r&b ballad': 'Romantic', 'slow jam': 'Romantic', bolero: 'Romantic', valentine: 'Romantic',
+  romantic: 'Romantic', sensual: 'Romantic', love: 'Romantic',
+
+  // --- Melancholic (specific subgenres before plain "blues") ---
+  heartbreak: 'Melancholic', melancholic: 'Melancholic', melancholy: 'Melancholic',
+  sadcore: 'Melancholic', slowcore: 'Melancholic', 'indie folk': 'Melancholic',
+  'singer-songwriter': 'Melancholic', emocore: 'Melancholic', emo: 'Melancholic',
+  ballad: 'Melancholic', 'blues rock': 'Melancholic', blues: 'Melancholic',
+  emotional: 'Melancholic', sad: 'Melancholic',
+
+  // --- Dark (specific metal/hardcore variants first) ---
+  'death metal': 'Dark', 'black metal': 'Dark', 'heavy metal': 'Dark', 'nu metal': 'Dark',
+  deathcore: 'Dark', grindcore: 'Dark', 'post-hardcore': 'Dark', screamo: 'Dark',
+  hardcore: 'Dark', thrash: 'Dark', sludge: 'Dark', doom: 'Dark', industrial: 'Dark',
+  'gothic rock': 'Dark', gothic: 'Dark', goth: 'Dark', grunge: 'Dark',
+  metal: 'Dark', heavy: 'Dark', aggressive: 'Dark', intense: 'Dark', angry: 'Dark', dark: 'Dark',
+  horror: 'Dark', noise: 'Dark',
+
+  // --- Energetic (specific dance/electronic/hip-hop/latin first) ---
+  'drum and bass': 'Energetic', 'big beat': 'Energetic', breakbeat: 'Energetic',
+  hardstyle: 'Energetic', dnb: 'Energetic', edm: 'Energetic', techno: 'Energetic',
+  trance: 'Energetic', house: 'Energetic', electro: 'Energetic', rave: 'Energetic',
+  jungle: 'Energetic',
+  'pop punk': 'Energetic', punk: 'Energetic',
+  'gangsta rap': 'Energetic', 'hip hop': 'Energetic', 'hip-hop': 'Energetic',
+  trap: 'Energetic', rap: 'Energetic',
+  reggaeton: 'Energetic', 'latin pop': 'Energetic', dancehall: 'Energetic', afrobeat: 'Energetic',
+  funk: 'Energetic', disco: 'Energetic',
+  energetic: 'Energetic', energy: 'Energetic', 'up-tempo': 'Energetic', upbeat: 'Energetic',
+  dance: 'Energetic',
+
+  // --- Chill (specific atmospheric subgenres first) ---
+  'trip hop': 'Chill', 'trip-hop': 'Chill', 'lo-fi': 'Chill', lofi: 'Chill',
+  chillout: 'Chill', chillwave: 'Chill', downtempo: 'Chill', ambient: 'Chill',
+  'bossa nova': 'Chill', 'smooth jazz': 'Chill', jazz: 'Chill', 'new age': 'Chill',
+  'dream pop': 'Chill', shoegaze: 'Chill', 'post-rock': 'Chill',
+  acoustic: 'Chill', instrumental: 'Chill',
+  chill: 'Chill', relaxing: 'Chill', relax: 'Chill', mellow: 'Chill',
+
+  // --- Happy ---
+  bubblegum: 'Happy', motown: 'Happy', tropical: 'Happy', summer: 'Happy',
+  reggae: 'Happy', ska: 'Happy', surf: 'Happy', swing: 'Happy',
+  'feel-good': 'Happy', 'feel good': 'Happy', joyful: 'Happy', joy: 'Happy',
+  happy: 'Happy', fun: 'Happy',
 };
 
-function mapMood(tags: string[]): string {
+export function mapMood(tags: string[]): string {
   for (const tag of tags) {
     const lower = tag.toLowerCase();
     if (MOOD_MAP[lower]) return MOOD_MAP[lower];
@@ -148,6 +190,37 @@ export async function runEnrichment(): Promise<void> {
   } finally {
     enrichmentRunning = false;
   }
+}
+
+export async function reclassifyMoods(): Promise<{ updated: number; distribution: Record<string, number> }> {
+  const db = getDatabase();
+
+  const rows: Array<{ spotify_uri: string; lastfm_tags: string }> = await new Promise((resolve, reject) => {
+    db.all(
+      `SELECT spotify_uri, lastfm_tags FROM track_enrichment
+       WHERE lastfm_tags IS NOT NULL AND lastfm_tags != '[]'`,
+      (err, r) => { if (err) reject(err); else resolve(r as any[]); },
+    );
+  });
+
+  const distribution: Record<string, number> = {};
+  await new Promise<void>((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+      const stmt = db.prepare('UPDATE track_enrichment SET mood = ? WHERE spotify_uri = ?');
+      for (const r of rows) {
+        let tags: string[] = [];
+        try { tags = JSON.parse(r.lastfm_tags); } catch { tags = []; }
+        const mood = tags.length > 0 ? mapMood(tags) : 'Neutral';
+        distribution[mood] = (distribution[mood] || 0) + 1;
+        stmt.run(mood, r.spotify_uri);
+      }
+      stmt.finalize();
+      db.run('COMMIT', (err) => { if (err) reject(err); else resolve(); });
+    });
+  });
+
+  return { updated: rows.length, distribution };
 }
 
 export async function getEnrichmentStatus(): Promise<EnrichmentStatus> {
